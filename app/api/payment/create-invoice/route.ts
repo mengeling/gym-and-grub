@@ -1,16 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { createClient } from "@/lib/supabase/server";
 
 const execAsync = promisify(exec);
 
 // Store payment status in memory (in production, use a database)
-const paymentStatus = new Map<string, { status: string; planId: string; amount: number }>();
+const paymentStatus = new Map<
+  string,
+  {
+    status: string;
+    planId: string;
+    amount: number;
+    invoice?: string;
+    sats: number;
+  }
+>();
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { amount, planId, description } = body;
+    const { amount, planId, description, userId } = body;
 
     if (!amount || !planId) {
       return NextResponse.json(
@@ -19,67 +29,146 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!userId) {
+      return NextResponse.json(
+        { error: "User ID is required" },
+        { status: 401 }
+      );
+    }
+
     // Convert USD to sats (approximate: 1 USD ≈ 3000 sats)
     // In production, use a real-time exchange rate API
     const sats = Math.round(amount * 3000);
 
     // Generate a unique payment ID
-    const paymentId = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const paymentId = `pay_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
 
-    // Create invoice using bark CLI
-    // Note: This requires bark to be installed and configured
-    // For production, you might want to use a bark API wrapper or service
+    // Create Lightning invoice for receiving payment
+    // Note: Lightning invoices have built-in payment tracking
     try {
-      // This is a placeholder - actual implementation depends on bark SDK/API
-      // You may need to configure bark server endpoint and credentials
-      const { stdout } = await execAsync(
-        `bark invoice ${sats} "${description}" --json || echo '{"invoice":"lnbc_placeholder_invoice"}'`
+      // Create a Lightning invoice using bark CLI
+      const { stdout: invoiceStdout, stderr: invoiceStderr } = await execAsync(
+        `bark lightning invoice "${sats} sats" --quiet 2>&1`
       );
 
       let invoiceData;
       try {
-        invoiceData = JSON.parse(stdout);
-      } catch {
-        // Fallback if bark is not available - create a mock invoice
-        invoiceData = {
-          invoice: `lnbc${sats.toString()}u1p${Date.now().toString()}...mock_invoice`,
-          payment_hash: paymentId,
-        };
+        // Parse JSON from stdout (may contain log messages, so find the JSON object)
+        const jsonMatch = invoiceStdout.match(/\{[\s\S]*"invoice"[\s\S]*\}/);
+        if (jsonMatch) {
+          invoiceData = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("No JSON found in bark output");
+        }
+      } catch (parseError) {
+        console.error("Failed to parse bark output:", parseError);
+        console.error("Bark stdout:", invoiceStdout);
+        console.error("Bark stderr:", invoiceStderr);
+        return NextResponse.json(
+          {
+            error: "Failed to create invoice: Invalid response from bark CLI",
+            details: invoiceStderr || invoiceStdout,
+          },
+          { status: 500 }
+        );
       }
 
-      // Store payment status
+      // Validate that we got a real invoice
+      const invoiceString = invoiceData.invoice || invoiceData.payment_request;
+      if (
+        !invoiceString ||
+        invoiceString.includes("placeholder") ||
+        invoiceString.includes("mock")
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Failed to create invoice: Invalid invoice received from bark",
+            details: "Bark returned an invalid or placeholder invoice",
+          },
+          { status: 500 }
+        );
+      }
+
+      // Calculate subscription expiration date
+      const now = new Date();
+      const expiresAt = new Date();
+      if (planId === "monthly") {
+        expiresAt.setMonth(now.getMonth() + 1);
+      } else if (planId === "yearly") {
+        expiresAt.setFullYear(now.getFullYear() + 1);
+      }
+
+      // Save subscription to database
+      const supabase = await createClient();
+      const { error: dbError } = await supabase.from("subscriptions").insert({
+        user_id: userId,
+        plan_id: planId,
+        status: "pending",
+        amount,
+        payment_id: paymentId,
+        invoice: invoiceString,
+        expires_at: expiresAt.toISOString(),
+      });
+
+      if (dbError) {
+        console.error("Failed to save subscription to database:", dbError);
+        // Continue anyway - we'll still return the invoice
+      }
+
+      // Store payment status in memory (for backward compatibility)
       paymentStatus.set(paymentId, {
         status: "pending",
         planId,
         amount,
+        invoice: invoiceString,
+        sats,
       });
 
-      // In production, you would:
-      // 1. Store the payment in a database
-      // 2. Set up a webhook listener for payment confirmations
-      // 3. Poll bark service for payment status
+      console.log(
+        `Payment ${paymentId} created: invoice=${invoiceString.substring(
+          0,
+          50
+        )}..., sats=${sats}, userId=${userId}`
+      );
 
       return NextResponse.json({
         paymentId,
-        invoice: invoiceData.invoice || invoiceData.payment_request,
+        invoice: invoiceString,
         sats,
         amount,
       });
-    } catch (error) {
-      console.error("Bark invoice creation error:", error);
-      // Return mock invoice for development
-      return NextResponse.json({
-        paymentId,
-        invoice: `lnbc${sats.toString()}u1p${Date.now().toString()}...mock_invoice`,
-        sats,
-        amount,
-        warning: "Bark CLI not configured. Using mock invoice for development.",
-      });
+    } catch (error: any) {
+      console.error("Bark address creation error:", error);
+
+      // Check if it's a command not found error
+      if (error.code === "ENOENT" || error.message?.includes("bark")) {
+        return NextResponse.json(
+          {
+            error: "Bark CLI is not installed or not in PATH",
+            details:
+              "Please install bark CLI and ensure it's available in your PATH",
+          },
+          { status: 500 }
+        );
+      }
+
+      // Return the actual error
+      return NextResponse.json(
+        {
+          error: "Failed to get Ark address",
+          details:
+            error.message || "Unknown error occurred while getting address",
+        },
+        { status: 500 }
+      );
     }
   } catch (error) {
     console.error("Payment creation error:", error);
     return NextResponse.json(
-      { error: "Failed to create payment invoice" },
+      { error: "Failed to create payment" },
       { status: 500 }
     );
   }
@@ -97,4 +186,3 @@ export function updatePaymentStatus(paymentId: string, status: string) {
 export function getPaymentStatus(paymentId: string) {
   return paymentStatus.get(paymentId);
 }
-
