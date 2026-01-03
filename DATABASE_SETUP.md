@@ -1,6 +1,6 @@
 # Database Setup Instructions
 
-To enable workout persistence, you need to create the database tables in Supabase.
+To set up the database for Gym and Grub, you need to run the initial schema migration in Supabase.
 
 ## Steps:
 
@@ -10,32 +10,46 @@ To enable workout persistence, you need to create the database tables in Supabas
    - Click on "SQL Editor" in the left sidebar
    - Click "New query"
 
-3. **Run the migration**:
-   - Copy the contents of `supabase/migrations/001_create_workouts_tables.sql`
+3. **If you have existing tables** (getting "already exists" errors):
+   - First run `supabase/migrations/000_cleanup.sql` to drop existing tables
+   - ⚠️ **WARNING**: This will delete all data! Only use in development.
+
+4. **Run the initial schema migration**:
+   - Copy the contents of `supabase/migrations/000_initial_schema.sql`
    - Paste it into the SQL editor
    - Click "Run" (or press Cmd/Ctrl + Enter)
 
 4. **Verify the tables were created**:
    - Go to "Table Editor" in the left sidebar
-   - You should see three new tables: `workouts`, `exercises`, and `sets`
+   - You should see the following tables:
+     - `workouts`
+     - `exercises`
+     - `sets`
+     - `subscriptions`
+     - `workout_templates`
+     - `template_exercises`
+     - `body_measurements`
+     - `exercise_database`
 
 ## What the migration does:
 
-- Creates three tables: `workouts`, `exercises`, and `sets`
-- Sets up relationships between tables (foreign keys)
-- Enables Row Level Security (RLS) to ensure users can only access their own data
-- Creates policies that allow users to:
-  - View their own workouts, exercises, and sets
-  - Create new workouts, exercises, and sets
-  - Update their own workouts, exercises, and sets
-  - Delete their own workouts, exercises, and sets
+The initial schema creates all the necessary tables and includes:
 
-## Security:
+- **Workout tracking**: `workouts`, `exercises`, `sets` tables with RPE, rest timers, muscle groups, and more
+- **Subscriptions**: Payment and subscription management
+- **Workout templates**: Save and reuse workout routines
+- **Body measurements**: Track weight, body fat, and measurements
+- **Exercise database**: Pre-defined exercises with search functionality (60+ exercises pre-populated)
 
-All tables have Row Level Security enabled, which means:
+All tables have Row Level Security (RLS) enabled, which means:
 - Users can only see and modify their own data
-- Each workout is automatically associated with the logged-in user's ID
+- Each workout/template is automatically associated with the logged-in user's ID
 - Data is completely isolated between users
+- The exercise database is readable by all authenticated users
 
-Once you run this migration, your workouts will be saved to the database and will persist across page refreshes!
+## Migration Strategy
 
+- **Development/Pre-production**: Use the single `000_initial_schema.sql` file
+- **Post-deployment**: After your first production deployment, create separate numbered migration files for any schema changes (e.g., `005_add_new_feature.sql`)
+
+Once you run this migration, all features will be available!

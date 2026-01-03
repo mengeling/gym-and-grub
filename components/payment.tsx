@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { CreditCard, CheckCircle2, Loader2 } from "lucide-react";
-import { QRCode } from "react-qr-code";
+import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
