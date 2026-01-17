@@ -855,10 +855,11 @@ export function GymLogbook() {
                       <Input
                         id="sets"
                         type="number"
-                        value={newExercise.sets}
+                        value={newExercise.sets || ""}
                         onChange={(e) =>
-                          setNewExercise({ ...newExercise, sets: parseInt(e.target.value) || 0 })
+                          setNewExercise({ ...newExercise, sets: parseInt(e.target.value) || 3 })
                         }
+                        placeholder="3"
                       />
                     </div>
                     <div>
@@ -866,10 +867,11 @@ export function GymLogbook() {
                       <Input
                         id="reps"
                         type="number"
-                        value={newExercise.reps}
+                        value={newExercise.reps || ""}
                         onChange={(e) =>
-                          setNewExercise({ ...newExercise, reps: parseInt(e.target.value) || 0 })
+                          setNewExercise({ ...newExercise, reps: parseInt(e.target.value) || 10 })
                         }
+                        placeholder="10"
                       />
                     </div>
                     <div>
@@ -877,10 +879,11 @@ export function GymLogbook() {
                       <Input
                         id="weight"
                         type="number"
-                        value={newExercise.weight}
+                        value={newExercise.weight || ""}
                         onChange={(e) =>
                           setNewExercise({ ...newExercise, weight: parseFloat(e.target.value) || 0 })
                         }
+                        placeholder="0"
                       />
                     </div>
                   </div>
@@ -972,25 +975,27 @@ export function GymLogbook() {
                                   <TableCell>
                                     <Input
                                       type="number"
-                                      value={set.reps}
+                                      value={set.reps || ""}
                                       onChange={(e) =>
                                         updateSet(exercise.id, set.id, {
                                           reps: parseInt(e.target.value) || 0,
                                         })
                                       }
                                       className="w-20"
+                                      placeholder="0"
                                     />
                                   </TableCell>
                                   <TableCell>
                                     <Input
                                       type="number"
-                                      value={set.weight}
+                                      value={set.weight || ""}
                                       onChange={(e) =>
                                         updateSet(exercise.id, set.id, {
                                           weight: parseFloat(e.target.value) || 0,
                                         })
                                       }
                                       className="w-20"
+                                      placeholder="0"
                                     />
                                   </TableCell>
                                   <TableCell>
