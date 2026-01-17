@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GymLogbook } from "@/components/gym-logbook";
 import { CalorieTracker } from "@/components/calorie-tracker";
+import { BodyMeasurements } from "@/components/body-measurements";
 import { PaymentComponent } from "@/components/payment";
-import { Dumbbell, UtensilsCrossed, CreditCard } from "lucide-react";
+import { Dumbbell, UtensilsCrossed, CreditCard, Ruler } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { Loader2 } from "lucide-react";
 import { UserAccountMenu } from "@/components/user-account-menu";
@@ -42,22 +43,25 @@ export default function Home() {
               Gym and Grub
             </h1>
             <p className="text-muted-foreground">
-              Track your fitness journey with our comprehensive gym logbook and
-              calorie tracker
+              Your complete fitness and nutrition tracking platform - combining the best of Strong and Nutritionix
             </p>
           </div>
           <UserAccountMenu />
         </div>
 
         <Tabs defaultValue="gym" className="w-full">
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="gym" className="flex items-center gap-2">
               <Dumbbell className="h-4 w-4" />
               Gym Logbook
             </TabsTrigger>
             <TabsTrigger value="calories" className="flex items-center gap-2">
               <UtensilsCrossed className="h-4 w-4" />
-              Calorie Tracker
+              Nutrition
+            </TabsTrigger>
+            <TabsTrigger value="measurements" className="flex items-center gap-2">
+              <Ruler className="h-4 w-4" />
+              Body Stats
             </TabsTrigger>
             <TabsTrigger value="premium" className="flex items-center gap-2">
               <CreditCard className="h-4 w-4" />
@@ -69,6 +73,9 @@ export default function Home() {
           </TabsContent>
           <TabsContent value="calories" className="mt-6">
             <CalorieTracker />
+          </TabsContent>
+          <TabsContent value="measurements" className="mt-6">
+            <BodyMeasurements />
           </TabsContent>
           <TabsContent value="premium" className="mt-6">
             <PaymentComponent />
